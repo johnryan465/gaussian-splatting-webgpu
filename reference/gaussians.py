@@ -9,10 +9,11 @@ def computeMeanCov2D(mean: np.ndarray[3], focal_x: float, focal_y: float, tan_fo
     # and 31 in "EWA Splatting" (Zwicker et al., 2002).
     # Additionally considers aspect / scaling of viewport.
     # Transposes used to account for row-/column-major conventions.
-    t = viewmatrix[:3,:3] @ mean
+    t = viewmatrix @ np.concatenate((mean, np.array([1])), axis=0)
+    t = t[:3] / t[3]
     # t = t / t[3]
     #print("T", t)
-    new_mean = t[:2] / t[2]
+    # new_mean = t[:2]
     #print("mean", new_mean)
 
     limx = 1.3 * tan_fovx
@@ -51,7 +52,7 @@ def computeMeanCov2D(mean: np.ndarray[3], focal_x: float, focal_y: float, tan_fo
     #cov[1][1] += 0.3
     #print(mean)
     #print(cov)
-    return new_mean, cov[:2,:2]
+    return  cov[:2,:2]
 
 def computeCov3D(scale: np.ndarray[3], mod: float, rot: np.ndarray[4]) -> np.ndarray[3,3]:
     # Create scaling matrix
@@ -90,34 +91,13 @@ def compute_exp_precompute(gaussian: Gaussian, camera: Camera):
         gaussian.rotQuat,
     )
 
-    mean2d, conv2d = computeMeanCov2D(
+    conv2d = computeMeanCov2D(
         gaussian.position,
         camera.fovx,
         camera.fovy,
         np.tan(camera.fovx / 2),
         np.tan(camera.fovy / 2),
         conv3d,
-        viewmatrix=camera.camera_matrix,
+        viewmatrix=camera.world_to_screen,
     )
-    return mean2d, conv2d
-
-def compute_exp_factor(gaussian: Gaussian, camera: Camera, x: float, y: float):
-    conv3d = computeCov3D(
-        gaussian.scale,
-        1.0,
-        gaussian.rotQuat,
-    )
-
-    mean2d, conv2d = computeMeanCov2D(
-        gaussian.position,
-        camera.fovx,
-        camera.fovy,
-        np.tan(camera.fovx / 2),
-        np.tan(camera.fovy / 2),
-        conv3d,
-        viewmatrix=camera.camera_matrix,
-    )
-
-    distance_from_mean = np.array([x, y]) - mean2d
-    exp_term = np.exp(-0.5 *  distance_from_mean.T @ np.linalg.inv(conv2d) @ distance_from_mean)
-    return exp_term
+    return conv2d

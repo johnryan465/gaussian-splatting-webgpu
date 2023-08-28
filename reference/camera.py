@@ -3,32 +3,15 @@ from dataclasses import dataclass
 import numpy as np
 
 
-# Convert to python
-def getProjectionMatrix(znear: float, zfar: float, fovX: float, fovY: float) -> np.ndarray[4, 4]:
-    """Return the projection matrix"""
-    tanHalfFovY = np.tan(fovY / 2)
-    tanHalfFovX = np.tan(fovX / 2)
-
-
-    P = np.zeros((4, 4))
-
-    z_sign = 1
-
-    P[0, 0] = 1 / (tanHalfFovY)
-    P[1, 1] =  1 / (tanHalfFovX)
-    P[3, 2] = z_sign
-    P[2, 2] = z_sign * zfar / (zfar - znear)
-    P[2, 3] = -(zfar * znear) / (zfar - znear)
-    return P
-
 
 def rotation_translation(rotation: np.ndarray[3, 3], translation: np.ndarray[3]) -> np.ndarray[4, 4]:
     """Return a rotation translation matrix"""
-    return np.concatenate(
-        (np.concatenate((rotation, translation.reshape(3, 1)), axis=1),
-        np.array([[0, 0, 0, 1]])),
-        axis=0
-    )
+    return np.array(
+        [  [rotation[0][0], rotation[0][1], rotation[0][2], translation[0]],
+            [rotation[1][0], rotation[1][1], rotation[1][2], translation[1]],
+            [rotation[2][0], rotation[2][1], rotation[2][2], translation[2]],
+            [0, 0, 0, 1]]
+        )
 
 @dataclass
 class Camera:
@@ -54,30 +37,26 @@ class Camera:
 
     
     def world_to_view(self, point: np.ndarray[3]) -> np.ndarray[3]:
-        p = self.view_matrix @ np.concatenate((point, np.array([1])), axis=0)
+        p = self.world_to_camera_matrix @ np.concatenate((point, np.array([1])), axis=0)
         return p[:3] / p[3]
     
     def world_to_ndc(self, point: np.ndarray[3]) -> np.ndarray[3]:
         """Convert a point in world space to ndc space"""
-        p = self.camera_matrix @ np.concatenate((point, np.array([1])), axis=0)
-        return p[:3] / p[3]
+        p = self.world_to_screen @ np.concatenate((point, np.array([1])), axis=0)
+        p = p[:3] / p[3]
+        return p
 
 
     def is_inside_frustum(self, world_space: np.ndarray) -> bool:
         """Check if a point is inside a view frustum"""
-        ndc = self.world_to_ndc(world_space)
-        print(ndc)
-        # print(ndc / ndc[2])
-        # point = np.concatenate((point, np.array([0])), axis=0)
-        if ndc[2] < 0:
+        # ndc = self.world_to_ndc(world_space)
+        # cam_space = self.world_to_view(world_space)
+        p = self.world_to_screen @ np.concatenate((world_space, np.array([1])), axis=0)
+        if p[3] < 0:
             return False
-        # if ndc[2] > 1:
-        #    return False
-        if ndc[0] > 1 or ndc[0] < -1:
-            return False
-        if ndc[1] > 1 or ndc[1] < -1:
-            return False
-        return True
+        ndc = p[:3] / p[3]
+        return -1 <= ndc[0] <= 1 and -1 <= ndc[1] <= 1 and -1 <= ndc[2] <= 1
+
         
     
     
@@ -92,10 +71,20 @@ class Camera:
         return np.array([
             [ 1 / self.tanHalfFovX, 0, 0, 0],
             [0, 1/ self.tanHalfFovY,  0, 0],
-            [0, 0,  -(self.far + self.near) / (self.far - self.near), - 2* self.far * self.near / (self.far - self.near)],
-            [0, 0, -1, 0]]).T
+            [0, 0,  -(self.far + self.near) / (self.far - self.near), 2* self.far * self.near / (self.far - self.near)],
+            [0, 0, 1, 0]])
     
     @property
-    def camera_matrix(self) -> np.ndarray[4, 4]:
+    def world_to_camera_matrix(self) -> np.ndarray[4, 4]:
+        """Return the world to camera matrix"""
+        return self.view_matrix
+    
+    @property
+    def camera_to_screen_matrix(self) -> np.ndarray[4, 4]:
+        """Return the camera to screen matrix"""
+        return self.projection_matrix
+    
+    @property
+    def world_to_screen(self) -> np.ndarray[4, 4]:
         """Return the camera matrix"""
-        return self.projection_matrix @ self.view_matrix
+        return self.camera_to_screen_matrix @ self.world_to_camera_matrix

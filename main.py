@@ -28,7 +28,7 @@ camera = Camera(
     near=0.009,
     far=1100.0
 )
-img = renderer.render(64, 64, camera, gaussians)
+img = renderer.render(25, 40, camera, gaussians)
 # %%
 from PIL import Image
 img = img * 255

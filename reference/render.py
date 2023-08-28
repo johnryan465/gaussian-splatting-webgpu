@@ -1,9 +1,8 @@
-from multiprocessing.pool import Pool
 import numpy as np
 from tqdm import tqdm
 from reference.camera import Camera
 from reference.loadfile import Gaussians
-from reference.gaussians import compute_exp_factor, compute_exp_precompute
+from reference.gaussians import compute_exp_precompute
 from reference.utils import computeColorFromSH
 
 
@@ -33,6 +32,7 @@ class Renderer:
         # Render gaussians
         img = np.zeros((width, height, 3))
         alpha = np.ones((width, height))
+        print(camera.world_to_screen)
 
 
         pixels = [(x, y) for x in range(width) for y in range(height)]
@@ -45,7 +45,8 @@ class Renderer:
                 gaussian.shCoeffs
             )
             colour = np.clip(colour, a_min=0.0, a_max=1.0)
-            mean2d, conv2d = compute_exp_precompute(gaussian, camera)
+            conv2d = compute_exp_precompute(gaussian, camera)
+            mean2d = gaussian.camera_space_pos[:2]
             inv_cov2d = np.linalg.inv(conv2d)
             for (x,y) in pixels:
                 if alpha[x, y] < 0.01:
@@ -68,7 +69,7 @@ class Renderer:
             if len(pixels) == 0:
                 break
             count += 1
-            if count > 2000:
+            if count > 5000:
                 break
         return img
                     
