@@ -1,0 +1,3 @@
+out*
+point_cloud.ply
+__pycache__*
