@@ -8,6 +8,7 @@ from reference.utils import computeColorFromSH
 
 
 
+
 def ndc2Pix(v: float,  S: int):
     return ((v + 1.0) * S - 1.0) * 0.5
 
@@ -21,23 +22,32 @@ class Renderer:
         filtered_gaussians = []
         for gaussian in gaussians.gaussians:
             pos = gaussian.position
+
+
             if camera.is_inside_frustum(pos):
+                #view_space_pos = camera.world_to_view(pos)
+                #if camera.near < view_space_pos[2] < camera.far:
+                #    print(view_space_pos[2])
                 # camera_space_pos_4d = camera.camera_matrix @ np.concatenate((pos, np.array([1])), axis=0)
                 gaussian.camera_space_pos = camera.world_to_ndc(pos)
                 filtered_gaussians.append(gaussian)
 
         # Sort gaussians by distance to camera
-        sorted_gaussians = sorted(filtered_gaussians, key=lambda gaussian: -gaussian.camera_space_pos[2])
+        sorted_gaussians = sorted(filtered_gaussians, key=lambda gaussian: gaussian.camera_space_pos[2])
 
         # Render gaussians
         img = np.zeros((width, height, 3))
         alpha = np.ones((width, height))
-        print(camera.world_to_screen)
+        # print(camera.world_to_screen)
 
 
         pixels = [(x, y) for x in range(width) for y in range(height)]
         count = 0
+        means = []
         for gaussian in tqdm(sorted_gaussians):
+            #if gaussian.camera_space_pos[2] > 0.99:
+            #    break
+            # print(gaussian.camera_space_pos[2])
             colour = computeColorFromSH(
                 3,
                 gaussian.position,
@@ -47,15 +57,16 @@ class Renderer:
             colour = np.clip(colour, a_min=0.0, a_max=1.0)
             conv2d = compute_exp_precompute(gaussian, camera)
             mean2d = gaussian.camera_space_pos[:2]
+            means.append(gaussian.position)
             inv_cov2d = np.linalg.inv(conv2d)
+            pixels_copy = pixels.copy()
             for (x,y) in pixels:
-                if alpha[x, y] < 0.01:
-                    continue
                 camera_space_x =  (2 * (2 * x + 1) / (width * 2) - 1)
                 camera_space_y =  (2 * (2 * y + 1) / (height * 2) - 1)
                 # exp_term = compute_exp_factor(gaussian, camera, camera_space_x, camera_space_y)
                 distance_from_mean = np.array([camera_space_x, camera_space_y]) - mean2d
-                exp_term = np.exp(-0.5 *  distance_from_mean.T @ inv_cov2d @ distance_from_mean)
+                exp_term = np.exp(-0.5 * distance_from_mean.T @ inv_cov2d @ distance_from_mean)
+                # exp_term = np.exp(-0.5 * 90 *  distance_from_mean.T @ distance_from_mean)
                 curr_alpha = gaussian.opacity * exp_term
                 if curr_alpha < 1/255:
                     continue
@@ -64,12 +75,14 @@ class Renderer:
                 alpha[x, y] *= (1 - curr_alpha)
                 img[x,y] += weighted_sum
                 if(alpha[x, y] < 0.01):
-                   pixels.remove((x,y))
+                   pixels_copy.remove((x,y))
                 # img[x,y] = pixel_value
+            pixels = pixels_copy
             if len(pixels) == 0:
                 break
             count += 1
-            if count > 5000:
+            if count > 8000:
                 break
+            
         return img
                     

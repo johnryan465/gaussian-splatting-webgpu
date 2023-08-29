@@ -10,11 +10,9 @@ def computeMeanCov2D(mean: np.ndarray[3], focal_x: float, focal_y: float, tan_fo
     # Additionally considers aspect / scaling of viewport.
     # Transposes used to account for row-/column-major conventions.
     t = viewmatrix @ np.concatenate((mean, np.array([1])), axis=0)
-    t = t[:3] / t[3]
-    # t = t / t[3]
-    #print("T", t)
-    # new_mean = t[:2]
-    #print("mean", new_mean)
+    t = t[:3]
+    # t = t[:3] / t[3]
+
 
     limx = 1.3 * tan_fovx
     limy = 1.3 * tan_fovy
@@ -23,35 +21,17 @@ def computeMeanCov2D(mean: np.ndarray[3], focal_x: float, focal_y: float, tan_fo
     t[0] = np.clip(txtz, a_min=-limx, a_max=limx) * t[2]
     t[1] = np.clip(tytz, a_min=-limy, a_max=limy) * t[2]
 
-    #print("t", t)
-
-    # print(t[0])
-    # print(focal_x)
-    # print(focal_y)
-
 
     J = np.array([
         [focal_x / t[2], 0.0, -(focal_x * t[0]) / (t[2] * t[2])],
         [0.0, focal_y / t[2], -(focal_y * t[1]) / (t[2] * t[2])]])
-    # print("J", J)
 
     W = viewmatrix[:3,:3]
-    # print("W", W)
 
 
     M = J @ W
-    # print("M", M)
 
     cov = M @ cov3D @ M.T
-    # print("cov3d", cov3D)
-    # print("cov", cov)
-
-    # Apply low-pass filter: every Gaussian should be at least
-    # one pixel wide/high. Discard 3rd row and column.
-    #cov[0][0] += 0.3
-    #cov[1][1] += 0.3
-    #print(mean)
-    #print(cov)
     return  cov[:2,:2]
 
 def computeCov3D(scale: np.ndarray[3], mod: float, rot: np.ndarray[4]) -> np.ndarray[3,3]:
@@ -79,8 +59,6 @@ def computeCov3D(scale: np.ndarray[3], mod: float, rot: np.ndarray[4]) -> np.nda
     # Compute 3D world covariance matrix Sigma
     Sigma = M.T @ M
 
-    #print(Sigma)
-
     return Sigma[:3,:3]
 
 
@@ -95,9 +73,9 @@ def compute_exp_precompute(gaussian: Gaussian, camera: Camera):
         gaussian.position,
         camera.fovx,
         camera.fovy,
-        np.tan(camera.fovx / 2),
-        np.tan(camera.fovy / 2),
+        camera.tanHalfFovX,
+        camera.tanHalfFovY,
         conv3d,
-        viewmatrix=camera.world_to_screen,
+        viewmatrix=camera.world_to_camera_matrix,
     )
     return conv2d

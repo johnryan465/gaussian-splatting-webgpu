@@ -48,6 +48,8 @@ class Gaussians:
         offset = 0
         for i in range(vertex_count):
             offset, raw_vertex = self.read_raw_vertex(offset, vertex_data, property_types)
+            rotation = np.array([raw_vertex['rot_0'], raw_vertex['rot_1'], raw_vertex['rot_2'], raw_vertex['rot_3']])
+            rotation = rotation / np.linalg.norm(rotation)
             self.gaussians.append(
                 Gaussian(
                     position=np.array([raw_vertex['x'], raw_vertex['y'], raw_vertex['z']]),
